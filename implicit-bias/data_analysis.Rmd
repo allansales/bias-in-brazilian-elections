@@ -1,0 +1,137 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(reshape2)
+library(data.table)
+library(gmodels)
+library(ggplot2)
+```
+
+# Valid news embeddings
+```{r}
+threshold = 0.7
+embeddings_estadao_news = read_csv("data/2018/noticias_estadao/noticias_eleicao_estadao_config.csv") 
+valid_estadao_embeddings = embeddings_estadao_news %>% 
+  filter(acc >= threshold) %>% 
+  select(id) %>% 
+  distinct()
+
+embeddings_folha_news = read_csv("data/2018/noticias_folha/noticias_eleicao_folha_config.csv") 
+valid_folha_embeddings = embeddings_folha_news %>% 
+  filter(acc >= threshold) %>% 
+  select(id) %>% 
+  distinct()
+```
+
+```{r}
+get_data <- function(candidate_csv, party_csv, embedding_id = NULL){
+  candidate_biases = read_csv(candidate_csv)
+  candidate_biases$target_entity_type = "candidate"
+
+  party_biases = read_csv(party_csv)
+  party_biases$target_entity_type = "party"
+
+  biases = bind_rows(candidate_biases, party_biases)
+  
+  biases$seeds = with(biases, paste(seed_a, seed_b, seed_x, seed_y))
+  
+  biases = biases %>% select(-bias_entity, -bias_entity1, -seed_a, -seed_b, -seed_x, -seed_y)
+  
+  if(!is.null(embedding_id)){
+    biases = biases %>% filter(embedding %in% embedding_id)
+  }
+  
+  return(biases)
+}
+
+get_bounds <- function(values){
+  conf.interval = ci(values)
+  data.frame(as.list(conf.interval))
+}
+```
+
+# Data load for years
+```{r}
+# set each variable to the path of the bias file
+folha_candidates_csv = "biases/2018/candidatos_folha.csv"
+folha_party_csv = "biases/2018/partidos_folha.csv"
+
+estadao_candidates_csv = "biases/2018/candidatos_estadao.csv"
+estadao_party_csv = "biases/2018/partidos_estadao.csv"
+
+wikipedia_candidates_csv = "biases/2018/candidatos_wikipedia.csv"
+wikipedia_party_csv = "biases/2018/partidos_wikipedia.csv"
+
+folha_biases = get_data(folha_candidates_csv, folha_party_csv) %>% mutate(source = "folha")
+estadao_biases = get_data(estadao_candidates_csv, estadao_party_csv) %>% mutate(source = "estadao")
+
+biases = bind_rows(folha_biases, estadao_biases)
+```
+
+# Confidence interval for p-value and effect size by candidates and parties
+```{r, warning=FALSE}
+conf_intervals_p_value = biases %>% group_by(seeds, target_entity_type, metodo, source) %>% do(get_bounds(.$p_valor))
+conf_intervals_party_p_value = conf_intervals_p_value %>% filter(target_entity_type == "party")
+conf_intervals_party_p_value = conf_intervals_party_p_value %>% mutate(CI.lower = ifelse(is.nan(CI.lower), Estimate, CI.lower))
+conf_intervals_party_p_value = conf_intervals_party_p_value %>% mutate(CI.upper = ifelse(is.nan(CI.upper), Estimate, CI.upper))
+
+conf_intervals_candidate_p_value = conf_intervals_p_value %>% filter(target_entity_type == "candidate")
+conf_intervals_candidate_p_value = conf_intervals_candidate_p_value %>% mutate(CI.lower = ifelse(is.nan(CI.lower), Estimate, CI.lower))
+conf_intervals_candidate_p_value = conf_intervals_candidate_p_value %>% mutate(CI.upper = ifelse(is.nan(CI.upper), Estimate, CI.upper))
+```
+
+```{r, warning=FALSE}
+conf_intervals_effect = biases %>% group_by(seeds, target_entity_type, metodo, source) %>% do(get_bounds(.$tam_efeito))
+conf_intervals_effect = conf_intervals_effect %>% select(seeds, target_entity_type, metodo, source, Effect_size = Estimate, CI.lower.effect = CI.lower, CI.upper.effect = CI.upper)
+conf_intervals_party_effect = conf_intervals_effect %>% filter(target_entity_type == "party")
+conf_intervals_party_effect = conf_intervals_party_effect %>% mutate(CI.lower.effect = ifelse(is.nan(CI.lower.effect), Estimate, CI.lower.effect))
+conf_intervals_party_effect = conf_intervals_party_effect %>% mutate(CI.upper.effect = ifelse(is.nan(CI.upper.effect), Estimate, CI.upper.effect))
+
+conf_intervals_candidate_effect = conf_intervals_effect %>% filter(target_entity_type == "candidate")
+conf_intervals_candidate_effect = conf_intervals_candidate_effect %>% mutate(CI.lower.effect = ifelse(is.nan(CI.lower.effect), Estimate, CI.lower.effect))
+conf_intervals_candidate_effect = conf_intervals_candidate_effect %>% mutate(CI.upper.effect = ifelse(is.nan(CI.upper.effect), Estimate, CI.upper.effect))
+```
+
+```{r}
+conf_intervals_party_p_value = conf_intervals_party_p_value %>% inner_join(conf_intervals_party_effect)
+conf_intervals_candidate_p_value = conf_intervals_candidate_p_value %>% inner_join(conf_intervals_candidate_effect)
+```
+
+# P-Value
+## Conf interval for parties
+```{r}
+conf_intervals_party_p_value %>% ggplot(aes(metodo, Estimate, ymin = CI.lower, ymax = CI.upper, color = source)) + geom_errorbar(position = "dodge") + facet_wrap(~seeds)
+```
+
+```{r}
+significant_party = conf_intervals_party_p_value %>% filter(CI.upper <= 0.05) %>% arrange(seeds, target_entity_type, source)
+significant_party
+```
+
+```{r}
+significant_party %>% filter(metodo == "weat") %>% mutate(Error_p = Estimate - CI.lower, Error_effect = Effect_size - CI.lower.effect) %>% select(seeds, source, Estimate, Error_p, Effect_size, Error_effect) 
+```
+
+## Conf interval for candidates
+```{r}
+conf_intervals_candidate_p_value %>% ggplot(aes(metodo, Estimate, ymin = CI.lower, ymax = CI.upper, color = source, group = source)) + geom_errorbar(position = "dodge") + facet_wrap(~seeds)
+```
+
+```{r}
+significant_candidate = conf_intervals_candidate_p_value %>% filter(CI.upper <= 0.05) %>% arrange(seeds, target_entity_type, source)
+significant_candidate
+```
+
+```{r}
+significant_candidate %>% filter(metodo == "weat") %>% mutate(Error_p = Estimate - CI.lower, Error_effect = Effect_size - CI.lower.effect) %>% select(seeds, source, Estimate, Error_p, Effect_size, Error_effect) #%>% write_csv("data/2018/candidate_weat_p_value.csv")
+```
+
+
+
+
+

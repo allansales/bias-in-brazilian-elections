@@ -1,0 +1,4 @@
+target_entity_type,metodo,seeds,source,Estimate,Error_p,Effect_size,Error_effect
+party,weat,déficit superávit psl ciro,estadao,0.02857142857142857,0,1.4246714809536545,0.07006958406726183
+party,weat,déficit superávit pt ciro,folha,0.03333333333333333,0.010480881714722088,1.5377534855524806,0.10447281986499601
+party,weat,déficit superávit pt psl,estadao,0.03736263736263736,0.010884631961437932,-1.2834882732867423,0.0757372204663449

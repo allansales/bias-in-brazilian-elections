@@ -1,0 +1,16 @@
+1) Download raw data from news portals and wikipedia.xml
+
+2) In extract_text_from_xml: execute wikifil.pl to get wikipedia's xml and extract its text; removing tags, numbers and accents;
+command: perl wikifil.pl > <filename>
+
+3) In process_text_expressions: run preprocess_expressions_tuned.sh into wikipedia, comment and news' data to manage some expressions, remove punctuation (except dot) and convert text to lower case;
+command: bash preprocess_expressions_tuned.sh <filename> true
+
+4) In vectors_generation: execute vectors_generation.ipynb to create word embeddings using processed wikipedia.
+
+5) In wmd: execute word_movers_distance.ipynb passing all data and text separatedly to the script. Or alternatively, execute wmd.py passing (i) raw data, (ii) processed text, (iii) output name and (iv) the processing starting line.
+command: python wmd.py <raw_data> <processed_data> <output_name> <initial_row_number>
+
+6) If want to, wiki_wmd.py calculate the rates for a sample of wikipedia's articles.
+
+* Alternatively, we are already making available files containing a wikipedia trained model and the texts with the calculated rates.
