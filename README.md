@@ -1,5 +1,7 @@
-# News Media Bias in brazilian elections
+# Media Bias Characterization in Brazilian Presidential Elections
 
-How to compute coverage, word association and subjective bias in news text.
+Code used to create and run experiments intending to unveal coverage, word assossiation and subjective bias in 2010, 2014 and 2018 brazillian presidential elections related to the paper Media Bias Characterization in Brazilian Presidential Elections.
 
+All data can be assessed [here]. Both raw data and processed data are available to compute biases.
 
+To run any experiment, just download the data, place in the correspondent folder and follow instructions on the READ.ME file placed inside the folder.
