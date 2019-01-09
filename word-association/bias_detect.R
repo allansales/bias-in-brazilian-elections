@@ -18,25 +18,23 @@ noticias = read_csv("./data/2018/noticias_folha/noticias_eleicao_folha.csv", col
 binary_path = "./data/2018/noticias_folha/binary/"
 output_1 = "candidatos_folha.csv" # candidates file output
 output_2 = "partidos_folha.csv"  # parties file output
-automatic_set_construction = T
+automatic_set_construction = T # get most similar words according to wikipedia to construct attribute sets
 #################################################
 
-# Configuracao dos embeddings
-min_atributos = 10
-
+attr_min_size = 10
 results_1 = data_frame()
 results_2 = data_frame()
 weat = "weat"
 
 #################################################
 # word sets to define candidates and parties
-## candidates
+## candidates 2018
 haddad = c("haddad","pt","lula","petista")
 bolsonaro = c("bolsonaro","jair","psl","exmilitar")
 ciro = c("ciro","pdt","pedetista","gomes")
 marina = c("marina","exsenadora","exministra","silva")
 
-## parties
+## parties 2018
 pt = c("pt","haddad","lula","gleisi")
 psl = c("psl","jair","bolsonaro","exmilitar")
 pdt = c("pdt","ciro","pedetista","lupi")
@@ -61,7 +59,7 @@ for(i in 1:n){
     # if automatically constructing the attribute set of words, add concept words to construct the sets here
     palavras_fontes_atributos = data_frame(palavra_1 = c("péssimo", "imoral", "inaceitável", "déficit", "estagnação"),
                                          palavra_2 = c("ótimo", "moral", "aceitável", "superávit", "desenvolvimento"))
-    palavras_atributos = palavras_fontes_atributos %>% rowwise() %>% do(cria_conjunto_generico_unico_alvo(we, .$palavra_1, .$palavra_2, we_wikipedia_pt, min_atributos))
+    palavras_atributos = palavras_fontes_atributos %>% rowwise() %>% do(cria_conjunto_generico_unico_alvo(we, .$palavra_1, .$palavra_2, we_wikipedia_pt, attr_min_size))
   }
   
   if (!automatic_set_construction){

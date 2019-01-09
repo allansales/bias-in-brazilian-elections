@@ -1,5 +1,5 @@
 # News Media Bias in brazilian elections
 
-Instructions of how run coverage, implicit and subjective bias in text submitted for ECML PKDD 2019.
+How to compute coverage, word association and subjective bias in news text.
 
 

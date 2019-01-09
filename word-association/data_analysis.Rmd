@@ -12,22 +12,6 @@ library(gmodels)
 library(ggplot2)
 ```
 
-# Valid news embeddings
-```{r}
-threshold = 0.7
-embeddings_estadao_news = read_csv("data/2018/noticias_estadao/noticias_eleicao_estadao_config.csv") 
-valid_estadao_embeddings = embeddings_estadao_news %>% 
-  filter(acc >= threshold) %>% 
-  select(id) %>% 
-  distinct()
-
-embeddings_folha_news = read_csv("data/2018/noticias_folha/noticias_eleicao_folha_config.csv") 
-valid_folha_embeddings = embeddings_folha_news %>% 
-  filter(acc >= threshold) %>% 
-  select(id) %>% 
-  distinct()
-```
-
 ```{r}
 get_data <- function(candidate_csv, party_csv, embedding_id = NULL){
   candidate_biases = read_csv(candidate_csv)
@@ -63,9 +47,6 @@ folha_party_csv = "biases/2018/partidos_folha.csv"
 
 estadao_candidates_csv = "biases/2018/candidatos_estadao.csv"
 estadao_party_csv = "biases/2018/partidos_estadao.csv"
-
-wikipedia_candidates_csv = "biases/2018/candidatos_wikipedia.csv"
-wikipedia_party_csv = "biases/2018/partidos_wikipedia.csv"
 
 folha_biases = get_data(folha_candidates_csv, folha_party_csv) %>% mutate(source = "folha")
 estadao_biases = get_data(estadao_candidates_csv, estadao_party_csv) %>% mutate(source = "estadao")
@@ -128,7 +109,7 @@ significant_candidate
 ```
 
 ```{r}
-significant_candidate %>% filter(metodo == "weat") %>% mutate(Error_p = Estimate - CI.lower, Error_effect = Effect_size - CI.lower.effect) %>% select(seeds, source, Estimate, Error_p, Effect_size, Error_effect) #%>% write_csv("data/2018/candidate_weat_p_value.csv")
+significant_candidate %>% filter(metodo == "weat") %>% mutate(Error_p = Estimate - CI.lower, Error_effect = Effect_size - CI.lower.effect) %>% select(seeds, source, Estimate, Error_p, Effect_size, Error_effect)
 ```
 
 
