@@ -4,6 +4,6 @@ Code used to create and run experiments intending to unveil coverage, word assoc
 
 All data can be assessed [here]. Both raw data and processed data are available to compute biases.
 
-To run an experiment, just download the data, place in the correspondent folder and follow instructions on the READ.ME file placed inside the folder.
+To run an experiment, just download the data, place into the correspondent folder and follow the instructions in the READ.ME file placed inside its folder.
 
 [here]: <https://drive.google.com/open?id=1ktUNI7m4v7Ngo_1KZa960QkOqAhviDcg>
