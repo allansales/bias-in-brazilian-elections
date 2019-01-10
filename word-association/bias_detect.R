@@ -26,9 +26,9 @@ results_1 = data_frame()
 results_2 = data_frame()
 weat = "weat"
 
-#################################################
 # word sets to define candidates and parties
-## candidates 2018
+#################################################
+## words 2018 election
 haddad = c("haddad","pt","lula","petista")
 bolsonaro = c("bolsonaro","jair","psl","exmilitar")
 ciro = c("ciro","pdt","pedetista","gomes")
@@ -39,10 +39,34 @@ pt = c("pt","haddad","lula","gleisi")
 psl = c("psl","jair","bolsonaro","exmilitar")
 pdt = c("pdt","ciro","pedetista","lupi")
 rede = c("rede","sustentabilidade","marina","exsenadora")
-#################################################
 
 candidates = c("haddad", "bolsonaro", "ciro", "marina")
 parties = c("pt", "psl", "pdt", "rede")
+#################################################
+## words 2014
+# dilma = c("dilma","rousseff","petista","pt")
+# aecio = c("aécio", "tucano", "neves", "psdb")
+# marina = c("marina","senadora","psb","silva")
+# 
+# pt = c("pt","petista","dilma","lula")
+# psdb = c("psdb","tucano","aécio","fhc")
+# psb = c("psb","pessebista","marina","campos")
+# 
+# candidates = c("dilma", "marina", "aecio")
+# parties = c("pt", "psb", "psdb")
+#################################################
+## words 2010
+# dilma = c("dilma","rousseff","petista","pt")
+# serra = c("serra","tucano","psdb","presidenciavel")
+# marina = c("marina","senadora","pv","silva")
+# 
+# pt = c("pt","petista","dilma","lula")
+# psdb = c("psdb","tucano","serra","alckmin")
+# pv = c("pv","marina","pvac","silva")
+# 
+# candidates = c("dilma", "marina", "serra")
+# parties = c("pt", "psdb", "pv")
+#################################################
 
 candidates_comb = combn(candidates, 2)
 parties_comb = combn(parties, 2)
@@ -69,7 +93,7 @@ for(i in 1:n){
     palavras_atributos = data_frame(seed_a = "pejorativos_esquerda", seed_b = "pejorativos_direita", palavras_a = pejorativos_esquerda, palavras_b = pejorativos_direita)
   }
   
-  # vieses candidatos para weat com cosseno
+  # candidates biases compute
   candidates_bias_list = apply(candidates_comb, 2, get_bias_results, we, weat, palavras_atributos)
   results_1_weat = bind_rows(candidates_bias_list)
   results_1_weat$metodo = weat
@@ -77,7 +101,7 @@ for(i in 1:n){
   results_1 = bind_rows(results_1, results_1_weat)
   write_csv(results_1, paste('biases/', output_1, sep=""))
   
-  # vieses partidos para weat com cosseno
+  # parties biases compute
   parties_bias_list = apply(parties_comb, 2, get_bias_results, we, weat, palavras_atributos)
   results_2_weat = bind_rows(parties_bias_list)
   results_2_weat$metodo = weat
