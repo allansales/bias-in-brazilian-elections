@@ -240,7 +240,8 @@ col_discriminant = "Dif"
 conf_int_data = CI.dif
 dashed_line_at = 0
   
-p = CI.dif %>% CI_plot(x, grid_formula, col_discriminant, dashed_line_at)
+p = CI.dif %>% CI_plot(x, grid_formula, col_discriminant, dashed_line_at) + 
+  scale_y_continuous(breaks = c(0), label = c("0.0"))
 p
 ggsave("candidates_subjectivity.pdf", plot = p, device = "pdf", height = 4)
 ```
