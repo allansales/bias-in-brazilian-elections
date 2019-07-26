@@ -1,0 +1,361 @@
+---
+title: "research_questions"
+author: "Allan Sales"
+date: "2 de julho de 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(stringr)
+library(dplyr)
+library(readr)
+
+library(reshape2)
+library(data.table)
+
+library(gmodels)
+
+library(wordVectors)
+
+library(ggpubr)
+library(corrplot)
+
+library(ggpubr)
+library(gridExtra)
+library(grid)
+```
+
+# Functions initialization
+```{r}
+# get news of a theme
+news_of_theme <- function(data, theme, secao, get_from_theme = T){
+  true_false_vector <- data %>% select(secao) %>% 
+    unlist() %>% as.vector() %>% 
+    tolower() %>% str_detect(theme)
+  
+  if(get_from_theme){
+    news <- data %>% filter(true_false_vector == TRUE)
+  } else {
+    news <- data %>% filter(true_false_vector == FALSE)
+  }
+  return(news)
+}
+
+get_bounds <- function(values){
+  conf.interval = ci(values)
+  data.frame(as.list(conf.interval))
+}
+
+# get cconfidence interval by year and section
+get_conf_by_year_section = function(news, group_var, pattern_filter = NULL){
+  if(!is.null(pattern_filter)){
+    news = news %>% news_of_theme(pattern_filter, "text")  
+  }
+  
+  melted_ratings = melt(news, id=c("text", "source", "section", "day", "month", "year","title","url","content"))
+  conf_by_year_sec = melted_ratings %>% group_by_(.dots = group_var) %>% do(get_bounds(.$value))
+  
+  if(!is.null(pattern_filter)){
+    conf_by_year_sec$entity = pattern_filter  
+  }
+  return(conf_by_year_sec)
+}
+
+get_mean_conf_dif_intra = function(news, group_var, pattern_1, pattern_2){
+  
+  t_test_run = function(grouped_df){
+    values_1 = grouped_df %>% filter(entity == pattern_1)
+    values_2 = grouped_df %>% filter(entity == pattern_2)
+    t_test = t.test(values_2$value, values_1$value)
+    data_frame(p.value = t_test$p.value, CI.lower = t_test$conf.int[1], CI.upper = t_test$conf.int[2])
+  }
+  
+  if(!is.null(pattern_1)){
+    news_1 = news %>% news_of_theme(pattern_1, "text")  
+  }
+  
+  melted_ratings_1 = melt(news_1, id=c("text", "source", "section", "day", "month", "year","title","url","content"))
+  melted_ratings_1$entity = pattern_1
+  
+  if(!is.null(pattern_2)){
+    news_2 = news %>% news_of_theme(pattern_2, "text")  
+  }
+  
+  melted_ratings_2 = melt(news_2, id=c("text", "source", "section", "day", "month", "year","title","url","content"))
+  melted_ratings_2$entity = pattern_2
+  
+  melted_ratings = bind_rows(melted_ratings_1, melted_ratings_2)
+  conf_by_year_sec = melted_ratings %>% group_by_(.dots = group_var) %>% do(t_test_run(.))
+  return(conf_by_year_sec)
+}
+
+get_intra_bias = function(news, target_year, sec, group_var, entity_1, entity_2, entity_3){
+  news_year = news %>% filter(year == target_year, section == sec)
+  CI.dif.ent3.ent1 = news_year %>% get_mean_conf_dif_intra(group_var, entity_3, entity_1) %>% mutate(Dif = paste(entity_1, entity_3, sep = " - "))
+  CI.dif.ent2.ent1 = news_year %>% get_mean_conf_dif_intra(group_var, entity_2, entity_1) %>% mutate(Dif = paste(entity_1, entity_2, sep = " - "))
+  CI.dif.ent2.ent3 = news_year %>% get_mean_conf_dif_intra(group_var, entity_2, entity_3) %>% mutate(Dif = paste(entity_3, entity_2, sep = " - "))
+
+  CI.dif.year = bind_rows(CI.dif.ent3.ent1, CI.dif.ent2.ent1, CI.dif.ent2.ent3)
+}
+
+get_mean_conf_dif_inter = function(data, entity, news_1, news_2){
+  
+  t_test_run = function(grouped_df){
+    values_1 = grouped_df %>% filter(source == news_1$source %>% unique())
+    values_2 = grouped_df %>% filter(source == news_2$source %>% unique())
+    t_test = t.test(values_2$value, values_1$value, paired = F)
+    
+    data_frame(p.value = t_test$p.value, CI.lower = t_test$conf.int[1], CI.upper = t_test$conf.int[2])
+  }
+  
+  news_1 = news_1 %>% news_of_theme(entity, "text")
+  news_2 = news_2 %>% news_of_theme(entity, "text")  
+  
+  melted_ratings_1 = melt(news_1, id=c("text", "source", "section", "day", "month", "year","title","url","content"))
+  melted_ratings_2 = melt(news_2, id=c("text", "source", "section", "day", "month", "year","title","url","content"))
+  
+  melted_ratings = bind_rows(melted_ratings_1, melted_ratings_2)
+  conf_by_year_sec = melted_ratings %>% group_by_(.dots = c("variable","year","section")) %>% do(t_test_run(.))
+  return(conf_by_year_sec)
+}
+
+get_entity_inter_bias = function(entity, news, target_year, sec, source_1_name, source_2_name, source_3_name){
+  
+  news_year = news %>% filter(year == target_year, section == sec)
+  source_1 = news_year %>% filter(source == source_1_name)
+  source_2 = news_year %>% filter(source == source_2_name)
+  source_3 = news_year %>% filter(source == source_3_name)
+  
+  CI.dif.source3.source1 = news_year %>% get_mean_conf_dif_inter(entity, source_3, source_1) %>% mutate(Dif = paste(source_1_name, source_3_name, sep = " - "), entity = entity)
+  CI.dif.source2.source1 = news_year %>% get_mean_conf_dif_inter(entity, source_2, source_1) %>% mutate(Dif = paste(source_1_name, source_2_name, sep = " - "), entity = entity)
+  CI.dif.source2.source3 = news_year %>% get_mean_conf_dif_inter(entity, source_2, source_3) %>% mutate(Dif = paste(source_3_name, source_2_name, sep = " - "), entity = entity)
+
+  CI.dif.inter = bind_rows(CI.dif.source3.source1, CI.dif.source2.source1, CI.dif.source2.source3)
+}
+
+get_entities_inter_bias = function(news, target_year, sec, entities_vector, source_1_name, source_2_name, source_3_name){
+  entities_inter_bias_list = lapply(entities_vector, get_entity_inter_bias, news, target_year, sec, source_1_name, source_2_name, source_3_name)
+  entities_inter_bias_list %>% bind_rows()
+}
+
+
+# confidence interval plot
+CI_plot = function(conf_int_data, x, grid_formula, col_discriminant, dashed_line_at = NULL){
+  
+  conf_int_data$year = as.factor(conf_int_data$year)
+  
+  form = grid_formula %>% as.formula()
+  
+  plot = ggplot(conf_int_data, aes(get(x), fill = get(col_discriminant))) +
+    geom_errorbar(aes(ymin = CI.lower, 
+                    ymax = CI.upper, 
+                    color = get(col_discriminant)), 
+                    width = 1, position = "dodge") +
+    labs(fill = "", x = "") + 
+    facet_grid(form) + 
+    guides(color=guide_legend(title="")) + 
+    theme_bw()
+  
+  if(!is.null(dashed_line_at)){
+    plot = plot + geom_hline(yintercept = dashed_line_at, linetype = "dashed")
+  }
+  
+  plot + theme(legend.position="bottom")
+}
+```
+
+# data preparation
+```{r, warning=FALSE}
+wiki_data = read_csv("../data/wmd/wiki_rates.csv") %>% select(-class, -Comment)
+conf_wiki = melt(wiki_data) %>% group_by(variable) %>% do(get_bounds(.$value))
+conf_wiki$source = "Wikipedia"
+
+news = read_csv("news_subjectivity.csv")
+```
+
+```{r}
+group_var = c("variable", "source", "year", "section")
+melted_ratings = melt(news, id=c("text", "source", "section", "day", "month", "year","title","url","content"))
+```
+
+# Data distribution
+## Boxplot rates distribution
+```{r}
+sources_distribution_plot = melted_ratings %>% ggplot(aes(source, value)) + geom_boxplot() + facet_wrap(~variable)
+sources_distribution_plot
+```
+
+## Density 
+```{r}
+density_distribution_plot = melted_ratings %>% ggplot(aes(value, color = source)) + geom_density() + facet_wrap(~variable)
+density_distribution_plot
+```
+
+# Hypothesis test
+## Portals
+### Is there a significant difference between subjectivity rates of the text sources?
+```{r, warning=FALSE}
+conf_by_source = melted_ratings %>% group_by(variable, source) %>% do(get_bounds(.$value))
+conf_by_year = melted_ratings %>% group_by(variable, source, year) %>% do(get_bounds(.$value))
+conf_by_year_sec = melted_ratings %>% group_by(variable, source, year, section) %>% do(get_bounds(.$value))
+```
+
+```{r}
+conf_by_source = conf_by_source %>% bind_rows(conf_wiki)
+
+subjectivity_by_source = conf_by_source %>% ggplot(aes(source, Estimate, ymin = CI.lower, ymax = CI.upper, color = source)) +
+  geom_errorbar() + 
+  facet_wrap(. ~ variable) + 
+  labs(x = "", y = "", color = "News Outlet") + 
+  theme_bw()+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.text = element_text(size = 8),
+        legend.title = element_text(size = 8),
+        legend.position = c(1, 0), 
+        legend.justification = c(1, 0)
+  )
+  
+  
+subjectivity_by_source 
+ggsave("general_subjectivity.pdf", plot = subjectivity_by_source, device = "pdf", width = 4, height = 4)
+```
+
+### Do the subjectivity of portals are similar though years?
+```{r}
+subjectivity_years = conf_by_year %>% ggplot(aes(as.factor(year), Estimate, ymin = CI.lower, ymax = CI.upper, color = source)) + geom_errorbar(position = "dodge") + facet_wrap(variable ~ ., scales="free")  + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+subjectivity_years
+```
+
+### Do the subjectivity of sections are similar though years?
+```{r}
+section_name = c("politics","economy")
+formula = "section ~ variable"
+
+plot.dif.sec = conf_by_year_sec %>% ggplot() +
+  geom_errorbar(aes(as.factor(year), ymin = CI.lower, ymax = CI.upper, color = section), width = 1, position = "dodge") +
+  labs(fill = "", x = "") + 
+  facet_grid("variable ~ source") + 
+  theme_bw()
+
+plot.dif.sec
+```
+
+## Candidates
+### subjective inter bias by election
+```{r}
+CI.intra.2010 = news %>% get_intra_bias(2010, "politics", group_var, "dilma", "serra", "marina")
+CI.intra.2014 = news %>% get_intra_bias(2014, "politics", group_var, "dilma", "aecio", "marina")
+CI.intra.2018 = news %>% get_intra_bias(2018, "politics", group_var, "haddad", "bolsonaro", "ciro")
+CI.intra = bind_rows(CI.intra.2010, CI.intra.2014, CI.intra.2018)
+
+x = "variable"
+grid_formula = "year ~ source"
+col_discriminant = "Dif"
+#conf_int_data = CI.intra
+dashed_line_at = 0
+  
+p = CI.intra %>% CI_plot(x, grid_formula, col_discriminant, dashed_line_at) + 
+  scale_y_continuous(breaks = c(0), label = c("0.0"))
+
+p
+ggsave("candidates_subjectivity.pdf", plot = p, device = "pdf", height = 4)
+```
+
+```{r}
+entities_2018 = c("haddad","bolsonaro","ciro")
+entities_2014 = c("dilma","aecio","marina")
+entities_2010 = c("dilma", "serra", "marina")
+
+inter_bias_2018 = get_entities_inter_bias(news, 2018, "politics", entities_2018, "FOLHASP", "CartaCapital", "ESTADAO")
+inter_bias_2014 = get_entities_inter_bias(news, 2014, "politics", entities_2014, "FOLHASP", "CartaCapital", "ESTADAO")
+inter_bias_2010 = get_entities_inter_bias(news, 2010, "politics", entities_2010, "FOLHASP", "CartaCapital", "ESTADAO")
+#CI.inter = bind_rows(inter_bias_2018, inter_bias_2014, inter_bias_2010)
+
+x = "variable"
+grid_formula = "year ~ entity "
+col_discriminant = "Dif"
+dashed_line_at = 0
+  
+#CI.inter %>% CI_plot(x, grid_formula, col_discriminant, dashed_line_at) + scale_y_continuous(breaks = c(0), label = c("0.0"))
+
+p1 = inter_bias_2010 %>% CI_plot(x, grid_formula, col_discriminant, dashed_line_at) + 
+  scale_y_continuous(breaks = c(0), label = c("0.0"))
+
+p2 = inter_bias_2014 %>% CI_plot(x, grid_formula, col_discriminant, dashed_line_at) + 
+  scale_y_continuous(breaks = c(0), label = c("0.0"))
+
+p3 = inter_bias_2018 %>% CI_plot(x, grid_formula, col_discriminant, dashed_line_at) + 
+  scale_y_continuous(breaks = c(0), label = c("0.0"))
+
+plot_inter = ggarrange(p1, p2, p3, ncol = 1, nrow = 3, common.legend = T, legend = "bottom")
+plot_inter
+ggsave("candidates_subjectivity_inter.pdf", plot = plot_inter, device = "pdf", height = 6, width = 6)
+```
+
+
+## Parties
+### Subjectivity difference between PT and PSDB though years
+```{r}
+CI.dif.pt.psdb = news %>% get_mean_conf_dif_intra(group_var, "psdb", "pt") %>% filter(section == "politics")
+
+plot.dif.pt.psdb <- CI.dif.pt.psdb %>% 
+  ggplot() +
+  geom_errorbar(aes(as.factor(year), ymin = CI.lower, ymax = CI.upper), 
+                width = 1, position = "dodge") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(fill = "", x = "") + 
+  facet_grid("variable ~ source") + 
+  scale_y_continuous(breaks = c(0), label = c("0.0")) + 
+  theme_bw() + 
+  theme(text = element_text(size = 12),
+        axis.text = element_text(size = 12))
+  #theme(axis.text.x = element_blank(),
+  #      axis.ticks.x = element_blank())
+
+plot.dif.pt.psdb
+
+ggsave("pt_psdb_subjectivity.pdf", plot = plot.dif.pt.psdb, device = "pdf")
+```
+
+### Subjectivity difference between PT and PSL in 2018
+```{r}
+CI.dif.pt.psl = news %>% filter(year == 2018) %>% get_mean_conf_dif_intra(group_var, "psl", "pt") %>% filter(section == "politics")
+
+plot.dif.pt.psl <- CI.dif.pt.psl %>% 
+  ggplot() +
+  geom_errorbar(aes(variable, ymin = CI.lower, ymax = CI.upper, color = NULL), 
+                width = 1, position = "dodge") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(fill = "", x = "") + 
+  facet_wrap(". ~ source") + 
+  scale_y_continuous(breaks = c(0), label = c("0.0")) + 
+  theme_bw() #+
+  #theme(text = element_text(size = 20))
+        #axis.text = element_text(size = 20))
+
+plot.dif.pt.psl
+ggsave("pt_psl_subjectivity.pdf", plot = plot.dif.pt.psl, device = "pdf", height = 4, width = 4)
+```
+
+### Subjectivity difference between candidates into second round
+```{r}
+CI.candidates.sec.round = CI.dif.pt.psl %>% bind_rows(CI.dif.pt.psdb %>% filter(year %in% c(2010, 2014)))
+
+plot.dif.sec.round <- CI.candidates.sec.round %>% 
+  ggplot() +
+  geom_errorbar(aes(as.factor(year), ymin = CI.lower, ymax = CI.upper), 
+                width = 1, position = "dodge") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(fill = "", x = "") + 
+  facet_grid("variable ~ source") + 
+  scale_y_continuous(breaks = c(0), label = c("0.0")) + 
+  theme_bw() + 
+  theme(text = element_text(size = 12),
+        axis.text = element_text(size = 12))
+
+plot.dif.sec.round
+ggsave("subjetividade_second_round.pdf", plot = plot.dif.sec.round, device = "pdf", height = 6, width = 6)
+```
